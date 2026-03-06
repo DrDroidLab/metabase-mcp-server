@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
+
+# Load .env from current working directory (e.g. repo root) so config sees METABASE_* and MCP_*.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path.cwd() / ".env")
+except ImportError:
+    pass
 
 from .config import load_config
 from .metabase_provider import MetabaseToolProvider

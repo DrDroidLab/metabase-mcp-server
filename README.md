@@ -14,7 +14,7 @@ The server exposes three MCP tools:
 
 - Python 3.11+
 - Access to a Metabase instance (URL + API key)
-- [drdroid-debug-toolkit](https://github.com/your-org/drdroid-debug-toolkit) installed and importable with `core` on `PYTHONPATH` (see below)
+- [drdroid-debug-toolkit](https://github.com/DrDroidLab/drdroid-debug-toolkit) (installed automatically via `uv sync` or `pip install -e .`)
 
 ## Setup
 
@@ -27,29 +27,17 @@ uv venv .venv && source .venv/bin/activate   # or: python -m venv .venv && sourc
 uv sync   # or: pip install -e .
 ```
 
-### 2. Install the drdroid-debug-toolkit
+This installs the app and its dependencies, including **drdroid-debug-toolkit** (and Django, which the toolkit uses at import time). No manual `PYTHONPATH` is needed when using this install.
 
-The server uses the toolkit’s `MetabaseSourceManager` and protos. The toolkit expects a top-level `core` package on `PYTHONPATH`.
+### 2. (Optional) Use a local toolkit clone
 
-**Option A – Toolkit as sibling (e.g. same `projects/` folder):**
+If you use a **local clone** of drdroid-debug-toolkit instead of the PyPI/git dependency:
 
-```bash
-# From repo root
-cd /path/to/projects
-# If drdroid-debug-toolkit is at projects/drdroid-debug-toolkit:
-export PYTHONPATH="/path/to/projects/drdroid-debug-toolkit/drdroid_debug_toolkit:$PYTHONPATH"
-cd metabase-mcp-server
-uv sync
-```
+**Option A – Sibling repo (e.g. same `projects/` folder):**  
+Put the toolkit at `../drdroid-debug-toolkit` relative to this repo. The test conftest and the server’s connector code will add `drdroid_debug_toolkit` to `sys.path` when present.
 
-The server also tries to add a sibling `drdroid-debug-toolkit/drdroid_debug_toolkit` to `sys.path` automatically when that path exists.
-
-**Option B – Install toolkit in editable mode and set PYTHONPATH:**
-
-```bash
-pip install -e /path/to/drdroid-debug-toolkit
-export PYTHONPATH="/path/to/drdroid-debug-toolkit/drdroid_debug_toolkit:$PYTHONPATH"
-```
+**Option B – Editable install + PYTHONPATH:**  
+`pip install -e /path/to/drdroid-debug-toolkit` and set `PYTHONPATH` to the directory that contains the `core` package (the toolkit’s package root).
 
 ### 3. Configure Metabase
 
@@ -84,21 +72,18 @@ Override port with `MCP_PORT`, name with `MCP_SERVER_NAME`. See `.env.example` f
 
 ## Testing
 
-Install dev dependencies (pytest), install the package, then run tests:
-
-```bash
-cd metabase-mcp-server
-uv venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e ".[dev]"
-pytest
-```
-
-Or with uv:
+Install the package with dev dependencies (pytest), then run tests:
 
 ```bash
 uv sync --extra dev
 uv run pytest
+```
+
+Or with pip:
+
+```bash
+pip install -e ".[dev]"
+pytest
 ```
 
 Tests live in `tests/`: one always runs (config); two require `METABASE_URL` and `METABASE_API_KEY` (e.g. in `.env`) and the **project venv** (so `drdroid-debug-toolkit` and Django are available). Run with the venv’s Python (e.g. `./venv/bin/python -m pytest` or activate the venv then `pytest`). Using another Python may skip the credential tests with "No module named 'django'".
@@ -111,7 +96,7 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
    - **macOS:** Cursor → Settings → Cursor Settings → Features → MCP (or edit `~/.cursor/mcp.json`).
    - Or in your project: `.cursor/mcp.json` (project-specific).
 
-2. Add a stdio server entry (replace paths and credentials):
+2. Add a stdio server entry (replace `cwd` and credentials):
 
 ```json
 {
@@ -119,7 +104,7 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
     "metabase": {
       "command": "uv",
       "args": ["run", "metabase-mcp-server"],
-      "cwd": "/Users/jayeshsadhwani/projects/metabase-mcp-server",
+      "cwd": "/path/to/metabase-mcp-server",
       "env": {
         "METABASE_URL": "https://your-metabase.example.com",
         "METABASE_API_KEY": "your-api-key"
@@ -129,8 +114,8 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
 }
 ```
 
-- Use `cwd` as the path to your `metabase-mcp-server` repo.
-- Set `METABASE_URL` and `METABASE_API_KEY` in `env` (or rely on `.env` by ensuring the process is started from the repo directory).
+- Set `cwd` to your `metabase-mcp-server` repo root. If you put a `.env` there, the server loads it on startup.
+- Set `METABASE_URL` and `METABASE_API_KEY` in `env`, or rely on `.env` when `cwd` is the repo.
 - Restart Cursor or reload MCP so it picks up the config.
 
 3. In chat, you should see the Metabase tools (e.g. `list_tools`, `execute_tool`, `ping`). Ask to list Metabase tools or run a specific operation to test.
@@ -170,16 +155,19 @@ metabase-mcp-server/
 ├── .gitignore
 ├── README.md
 ├── pyproject.toml
-└── src/
-    └── metabase_mcp_server/
-        ├── __init__.py
-        ├── config.py
-        ├── connector.py
-        ├── drd_extractor.py
-        ├── manager.py
-        ├── metabase_provider.py
-        ├── server.py
-        └── tool_provider.py
+├── src/
+│   └── metabase_mcp_server/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── connector.py
+│       ├── drd_extractor.py
+│       ├── manager.py
+│       ├── metabase_provider.py
+│       ├── server.py
+│       └── tool_provider.py
+└── tests/
+    ├── conftest.py
+    └── test_server.py
 ```
 
 ## License
