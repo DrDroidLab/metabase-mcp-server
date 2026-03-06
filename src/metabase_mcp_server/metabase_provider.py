@@ -1,6 +1,7 @@
 """ToolProvider implementation that lists and executes Metabase tools via the drd SourceManager."""
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Dict, List
 
@@ -16,6 +17,28 @@ from .manager import MetabaseMCPManager
 from .tool_provider import ToolDefinition
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_struct_args(value: Any) -> Any:
+    """
+    Recursively normalize argument values for protobuf ParseDict.
+    String values that are JSON objects or arrays are parsed to dict/list
+    so that google.protobuf.Struct fields receive a dict, not a string.
+    """
+    if isinstance(value, str) and value.strip():
+        strip = value.strip()
+        if (strip.startswith("{") and strip.endswith("}")) or (
+            strip.startswith("[") and strip.endswith("]")
+        ):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    if isinstance(value, dict):
+        return {k: _normalize_struct_args(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_struct_args(v) for v in value]
+    return value
 
 
 class MetabaseToolProvider:
@@ -40,7 +63,8 @@ class MetabaseToolProvider:
             raise ValueError(f"Tool {name} missing task_type metadata")
         task_field = task_type_name.lower()
         # Pass arguments as plain scalars; protobuf ParseDict expects scalars for Int64Value/StringValue, not {"value": ...}.
-        task_payload = dict(arguments) if arguments else {}
+        # Normalize so any JSON-string fields (e.g. payload for CreateQuestion) become dicts for Struct fields.
+        task_payload = _normalize_struct_args(dict(arguments)) if arguments else {}
         now_ns = int(__import__("time").time() * 1_000_000_000)
         time_range = TimeRange(time_geq=now_ns - 86400 * 1_000_000_000, time_lt=now_ns)
         task_dict = {
