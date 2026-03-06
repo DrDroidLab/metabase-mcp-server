@@ -1,0 +1,4 @@
+# Core + drdroid-debug-toolkit (install with: pip install -r requirements.txt)
+mcp
+python-dotenv
+git+https://github.com/DrDroidLab/drdroid-debug-toolkit.git@master

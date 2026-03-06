@@ -12,6 +12,12 @@ dependencies = [
     "mcp",
     "python-dotenv",
     "drdroid-debug-toolkit",
+    "django",  # required by drdroid-debug-toolkit at import time (not declared there)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
 ]
 
 [project.scripts]

@@ -82,11 +82,36 @@ Or set the same variables in your shell or your MCP client config.
 
 Override port with `MCP_PORT`, name with `MCP_SERVER_NAME`. See `.env.example` for all options.
 
-## MCP client configuration
+## Testing
 
-### Cursor (stdio)
+Install dev dependencies (pytest), install the package, then run tests:
 
-In Cursor MCP settings (e.g. `~/.cursor/mcp.json` or project MCP config):
+```bash
+cd metabase-mcp-server
+uv venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e ".[dev]"
+pytest
+```
+
+Or with uv:
+
+```bash
+uv sync --extra dev
+uv run pytest
+```
+
+Tests live in `tests/`: one always runs (config); two require `METABASE_URL` and `METABASE_API_KEY` (e.g. in `.env`) and the **project venv** (so `drdroid-debug-toolkit` and Django are available). Run with the venv’s Python (e.g. `./venv/bin/python -m pytest` or activate the venv then `pytest`). Using another Python may skip the credential tests with "No module named 'django'".
+
+## MCP client configuration (Cursor)
+
+In Cursor, add the Metabase MCP server so you can call tools from the chat.
+
+1. Open Cursor MCP settings:
+   - **macOS:** Cursor → Settings → Cursor Settings → Features → MCP (or edit `~/.cursor/mcp.json`).
+   - Or in your project: `.cursor/mcp.json` (project-specific).
+
+2. Add a stdio server entry (replace paths and credentials):
 
 ```json
 {
@@ -94,7 +119,7 @@ In Cursor MCP settings (e.g. `~/.cursor/mcp.json` or project MCP config):
     "metabase": {
       "command": "uv",
       "args": ["run", "metabase-mcp-server"],
-      "cwd": "/path/to/metabase-mcp-server",
+      "cwd": "/Users/jayeshsadhwani/projects/metabase-mcp-server",
       "env": {
         "METABASE_URL": "https://your-metabase.example.com",
         "METABASE_API_KEY": "your-api-key"
@@ -104,7 +129,11 @@ In Cursor MCP settings (e.g. `~/.cursor/mcp.json` or project MCP config):
 }
 ```
 
-Or use your `.env` by running from the repo directory and not overriding `env`.
+- Use `cwd` as the path to your `metabase-mcp-server` repo.
+- Set `METABASE_URL` and `METABASE_API_KEY` in `env` (or rely on `.env` by ensuring the process is started from the repo directory).
+- Restart Cursor or reload MCP so it picks up the config.
+
+3. In chat, you should see the Metabase tools (e.g. `list_tools`, `execute_tool`, `ping`). Ask to list Metabase tools or run a specific operation to test.
 
 ### HTTP (remote server)
 
@@ -148,8 +177,8 @@ metabase-mcp-server/
         ├── connector.py
         ├── drd_extractor.py
         ├── manager.py
+        ├── metabase_provider.py
         ├── server.py
-        ├── tool_definitions.py
         └── tool_provider.py
 ```
 

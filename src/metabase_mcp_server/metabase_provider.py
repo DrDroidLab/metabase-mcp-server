@@ -63,8 +63,8 @@ class MetabaseToolProvider:
             "source": Source.METABASE,
             "task_connector_sources": [
                 {
-                    "name": {"value": MCP_CONNECTOR_NAME},
-                    "id": {"value": MCP_CONNECTOR_ID},
+                    "name": MCP_CONNECTOR_NAME,
+                    "id": MCP_CONNECTOR_ID,
                     "source": Source.METABASE,
                 }
             ],
