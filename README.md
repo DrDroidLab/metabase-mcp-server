@@ -86,7 +86,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Tests live in `tests/`: one always runs (config); two require `METABASE_URL` and `METABASE_API_KEY` (e.g. in `.env`) and the **project venv** (so `drdroid-debug-toolkit` and Django are available). Run with the venv’s Python (e.g. `./venv/bin/python -m pytest` or activate the venv then `pytest`). Using another Python may skip the credential tests with "No module named 'django'".
+Tests live in `tests/`: one always runs (config); two require `METABASE_URL` and `METABASE_API_KEY` and a venv with the toolkit. Conftest loads `.env` from the **repo root** (the folder that contains `src/` and `pyproject.toml`). **If the credential tests are skipped:** create a file named `.env` in that repo root, copy contents from `.env.example`, and set `METABASE_URL` and `METABASE_API_KEY` to your real Metabase URL and API key. Run pytest from the repo root (e.g. `cd metabase-mcp-server && pytest tests/`). Use a venv that has the toolkit and Django (e.g. `pip install -e ".[dev]"` or the drdroid-debug-toolkit venv with the server installed).
 
 ## MCP client configuration (Cursor)
 
@@ -114,11 +114,13 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
 }
 ```
 
-- Set `cwd` to your `metabase-mcp-server` repo root. If you put a `.env` there, the server loads it on startup.
-- Set `METABASE_URL` and `METABASE_API_KEY` in `env`, or rely on `.env` when `cwd` is the repo.
+- Set `cwd` to your **metabase-mcp-server repo root** (the folder that contains `src/`, `pyproject.toml`, and `.env`). The server loads `.env` from the process working directory only—so **do not** set `cwd` to a subfolder (e.g. not `src` or `src/metabase_mcp_server`), or `.env` won’t be found and the tool provider won’t start.
+- Set `METABASE_URL` and `METABASE_API_KEY` in `env`, or rely on `.env` when `cwd` is the repo root.
 - Restart Cursor or reload MCP so it picks up the config.
 
-3. In chat, you should see the Metabase tools (e.g. `list_tools`, `execute_tool`, `ping`). Ask to list Metabase tools or run a specific operation to test.
+1. In chat, you should see the Metabase tools (e.g. `list_tools`, `execute_tool`, `ping`). Ask to list Metabase tools or run a specific operation to test.
+
+**MCP not working?** Ensure `cwd` is the repo root (e.g. `/Users/you/projects/metabase-mcp-server`). Run `uv run metabase-mcp-server` from that directory in a terminal to confirm the server starts and that `.env` is in that directory.
 
 ### HTTP (remote server)
 
@@ -149,7 +151,7 @@ The template’s README describes the same flow and the abstract `ToolProvider` 
 
 ## Layout
 
-```
+```txt
 metabase-mcp-server/
 ├── .env.example
 ├── .gitignore
