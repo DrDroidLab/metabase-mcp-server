@@ -1,7 +1,26 @@
 from __future__ import annotations
 
+import importlib.util
+import sys
+from inspect import Parameter, Signature
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
+
+from pydantic import Field
+
+# drdroid-debug-toolkit uses "from core.xxx"; ensure its package root is on path before any toolkit import.
+if "core" not in sys.modules:
+    _server_root = Path(__file__).resolve().parent.parent.parent
+    _toolkit_root = None
+    spec = importlib.util.find_spec("drdroid_debug_toolkit")
+    if spec is not None and getattr(spec, "origin", None) and "drdroid_debug_toolkit" in (spec.origin or ""):
+        _toolkit_root = Path(spec.origin).resolve().parent
+    if _toolkit_root and _toolkit_root.is_dir() and str(_toolkit_root) not in sys.path:
+        sys.path.insert(0, str(_toolkit_root))
+    else:
+        _drd = _server_root.parent / "drdroid-debug-toolkit" / "drdroid_debug_toolkit"
+        if _drd.is_dir() and str(_drd) not in sys.path:
+            sys.path.insert(0, str(_drd))
 
 from mcp.server.fastmcp import FastMCP
 
@@ -26,72 +45,69 @@ _provider: Optional[ToolProvider] = None
 if app_config.backend.metabase and app_config.backend.metabase.url and app_config.backend.metabase.api_key:
     _provider = MetabaseToolProvider(app_config.backend.metabase.url, app_config.backend.metabase.api_key)
 
+# Map JSON Schema types to Python types for FastMCP parameter introspection.
+_JSON_TYPE_TO_PY: Dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def _make_tool_fn(tool_name: str) -> Any:
+    """Return a callable that executes the given provider tool by name."""
+    def _call(**kwargs: Any) -> Any:
+        if _provider is None:
+            return {"error": "No tool provider configured."}
+        try:
+            return _provider.call_tool(tool_name, kwargs)
+        except Exception as e:
+            return {"error": str(e)}
+    return _call
+
+
+def _register_provider_tools() -> None:
+    """Register each provider tool as its own MCP tool with name, description, and parameters from the schema."""
+    if _provider is None:
+        return
+    for t in _provider.list_tools():
+        schema = t.parameters_schema or {}
+        properties = schema.get("properties") or {}
+        required = set(schema.get("required") or [])
+        params: List[Parameter] = []
+        annotations: Dict[str, Any] = {}
+        for key in properties:
+            prop = properties[key]
+            if not isinstance(prop, dict):
+                continue
+            js_type = prop.get("type", "string")
+            py_type = _JSON_TYPE_TO_PY.get(js_type, Any)
+            desc = prop.get("description") or prop.get("title") or key
+            title = prop.get("title") or key
+            field_kwargs: Dict[str, Any] = {"description": desc}
+            if title and title != key:
+                field_kwargs["title"] = title
+            annotations[key] = Annotated[py_type, Field(**field_kwargs)]
+            default = Parameter.empty if key in required else None
+            params.append(Parameter(key, Parameter.KEYWORD_ONLY, default=default, annotation=annotations[key]))
+        fn = _make_tool_fn(t.name)
+        fn.__name__ = t.name.replace("-", "_")
+        fn.__doc__ = t.description
+        fn.__annotations__ = annotations
+        fn.__signature__ = Signature(params)
+        mcp.add_tool(fn, name=t.name, description=t.description)
+
 
 def set_tool_provider(provider: ToolProvider) -> None:
-    """Set the tool provider used by list_tools and execute_tool. Call this from your server setup."""
+    """Set the tool provider (e.g. for testing). Normally the provider is set at startup from config."""
     global _provider
     _provider = provider
 
 
-@mcp.tool()
-def ping() -> str:
-    """Simple health check tool for the MCP server template."""
-    return "pong"
-
-
-@mcp.tool()
-def echo(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Echo back a JSON payload.
-
-    This is mainly useful as a sanity check when wiring up new MCP
-    clients or testing transports.
-    """
-    return {"received": payload}
-
-
-@mcp.tool()
-def list_tools() -> List[Dict[str, Any]]:
-    """
-    List all tools provided by the backend (e.g. from a drd SourceManager).
-
-    Returns a list of tool definitions with name, description, and inputSchema.
-    Only populated when a tool provider has been set via set_tool_provider().
-    """
-    if _provider is None:
-        return [
-            {
-                "message": "No tool provider configured. Set a ToolProvider in server.py with set_tool_provider(provider) to expose backend tools.",
-                "tools": [],
-            }
-        ]
-    tools = _provider.list_tools()
-    return [
-        {
-            "name": t.name,
-            "description": t.description,
-            "inputSchema": t.parameters_schema,
-        }
-        for t in tools
-    ]
-
-
-@mcp.tool()
-def execute_tool(name: str, arguments: Dict[str, Any]) -> Any:
-    """
-    Execute a backend tool by name with the given arguments.
-
-    Use list_tools() to discover available tool names and their parameter schemas.
-    Only works when a tool provider has been set via set_tool_provider().
-    """
-    if _provider is None:
-        return {
-            "error": "No tool provider configured. Set a ToolProvider in server.py with set_tool_provider(provider).",
-        }
-    try:
-        return _provider.call_tool(name, arguments)
-    except Exception as e:
-        return {"error": str(e)}
+# Register each backend tool (e.g. metabase_list_databases, metabase_get_alert) as its own MCP tool.
+_register_provider_tools()
 
 
 def main() -> None:

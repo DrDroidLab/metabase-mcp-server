@@ -4,11 +4,12 @@ MCP server that exposes **Metabase** operations (alerts, pulses, dashboards, que
 
 ## Tools
 
-The server exposes three MCP tools:
+The server exposes each Metabase operation as its own MCP tool, with names and parameters taken from the drdroid-debug-toolkit task map. Examples:
 
-- **ping** – Health check.
-- **list_tools** – Returns all Metabase operations with name, description, and parameter schema (e.g. `metabase_list_alerts`, `metabase_get_alert`, `metabase_list_dashboards`, `metabase_execute_question`, …).
-- **execute_tool** – Runs a Metabase operation by name with a dict of arguments (use `list_tools` to discover names and parameters).
+- **metabase_list_alerts**, **metabase_get_alert**, **metabase_create_alert**, **metabase_update_alert**, **metabase_delete_alert**
+- **metabase_list_dashboards**, **metabase_list_databases**, **metabase_list_collections**
+- **metabase_execute_question**, **metabase_execute_sql_query**, **metabase_search**
+- …and the rest (pulses, questions, etc.), each with descriptions and parameters from the toolkit’s form fields.
 
 ## Requirements
 
@@ -29,17 +30,7 @@ uv sync   # or: pip install -e .
 
 This installs the app and its dependencies, including **drdroid-debug-toolkit** (and Django, which the toolkit uses at import time). No manual `PYTHONPATH` is needed when using this install.
 
-### 2. (Optional) Use a local toolkit clone
-
-If you use a **local clone** of drdroid-debug-toolkit instead of the PyPI/git dependency:
-
-**Option A – Sibling repo (e.g. same `projects/` folder):**  
-Put the toolkit at `../drdroid-debug-toolkit` relative to this repo. The test conftest and the server’s connector code will add `drdroid_debug_toolkit` to `sys.path` when present.
-
-**Option B – Editable install + PYTHONPATH:**  
-`pip install -e /path/to/drdroid-debug-toolkit` and set `PYTHONPATH` to the directory that contains the `core` package (the toolkit’s package root).
-
-### 3. Configure Metabase
+### 2. Configure Metabase
 
 Copy the example env and set your instance URL and API key:
 
@@ -96,7 +87,9 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
    - **macOS:** Cursor → Settings → Cursor Settings → Features → MCP (or edit `~/.cursor/mcp.json`).
    - Or in your project: `.cursor/mcp.json` (project-specific).
 
-2. Add a stdio server entry (replace `cwd` and credentials):
+2. Add a stdio server entry. **Important:** `command` must be an executable Cursor can find (e.g. `uv` or the **full path** to your venv’s Python). Do **not** use `"command": "metabase-mcp-server"` by itself—that binary only exists inside the project’s venv and will cause “No such file or directory”.
+
+**Option A – using uv (if `uv` is on your PATH when Cursor starts):**
 
 ```json
 {
@@ -114,13 +107,60 @@ In Cursor, add the Metabase MCP server so you can call tools from the chat.
 }
 ```
 
-- Set `cwd` to your **metabase-mcp-server repo root** (the folder that contains `src/`, `pyproject.toml`, and `.env`). The server loads `.env` from the process working directory only—so **do not** set `cwd` to a subfolder (e.g. not `src` or `src/metabase_mcp_server`), or `.env` won’t be found and the tool provider won’t start.
+**Option B – using the venv’s Python (most reliable; replace the path with your repo and venv):**
+
+```json
+{
+  "mcpServers": {
+    "metabase": {
+      "command": "/path/to/metabase-mcp-server/venv/bin/python",
+      "args": ["-m", "metabase_mcp_server.server"],
+      "cwd": "/path/to/metabase-mcp-server"
+    }
+  }
+}
+```
+
+On Windows use `venv\\Scripts\\python.exe` and adjust paths.
+
+- Set `cwd` to your **metabase-mcp-server repo root** (the folder that contains `src/`, `pyproject.toml`, and `.env`). The server loads `.env` from the process working directory only—so **do not** set `cwd` to a subfolder.
 - Set `METABASE_URL` and `METABASE_API_KEY` in `env`, or rely on `.env` when `cwd` is the repo root.
 - Restart Cursor or reload MCP so it picks up the config.
 
-1. In chat, you should see the Metabase tools (e.g. `list_tools`, `execute_tool`, `ping`). Ask to list Metabase tools or run a specific operation to test.
+1. In chat, use the tools panel to see Metabase tools (e.g. `metabase_list_databases`, `metabase_list_alerts`). Run a specific operation to test.
 
 **MCP not working?** Ensure `cwd` is the repo root (e.g. `/Users/you/projects/metabase-mcp-server`). Run `uv run metabase-mcp-server` from that directory in a terminal to confirm the server starts and that `.env` is in that directory.
+
+### Claude Desktop
+
+1. Open the Claude Desktop config file:
+   - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+   - Or in Claude Desktop: **Settings → Developer → Edit Config**.
+
+2. Add the Metabase MCP server to `mcpServers` (replace `cwd` with your repo path; you can omit `env` if you rely on `.env` in the repo):
+
+```json
+{
+  "mcpServers": {
+    "metabase": {
+      "command": "uv",
+      "args": ["run", "metabase-mcp-server"],
+      "cwd": "/Users/jayeshsadhwani/projects/metabase-mcp-server",
+      "env": {
+        "METABASE_URL": "https://your-metabase.example.com",
+        "METABASE_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+If you already have a `.env` in the repo root, you can leave `env` out and the server will load it when started with that `cwd`.
+
+1. Save the file and **fully quit and reopen Claude Desktop** (restart so it reloads MCP).
+
+2. In a new chat, click the **🔨 (tools)** icon to see available tools (e.g. `metabase_list_databases`, `metabase_list_alerts`). Run one to test.
 
 ### HTTP (remote server)
 

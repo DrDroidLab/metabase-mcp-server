@@ -51,7 +51,13 @@ def _form_field_to_schema(field: "FormField") -> ExtractedParameter:
         )
 
     key_name = field.key_name.value or ""
+    display_name = getattr(field, "display_name", None)
+    title = display_name.value if display_name and hasattr(display_name, "value") else key_name or ""
     description = field.description.value or ""
+    helper_text = getattr(field, "helper_text", None)
+    hint = (helper_text.value if helper_text and hasattr(helper_text, "value") else "") or ""
+    # Single description for the agent: title + description + hint so type and usage are clear.
+    full_description = " ".join(filter(None, [title, description, hint])).strip() or key_name
 
     # Map LiteralType to JSON Schema type.
     literal_type = field.data_type
@@ -67,12 +73,14 @@ def _form_field_to_schema(field: "FormField") -> ExtractedParameter:
         json_type = "string"
 
     schema: Dict[str, Any] = {"type": json_type}
-    if description:
-        schema["description"] = description
+    if title:
+        schema["title"] = title
+    if full_description:
+        schema["description"] = full_description
 
     return ExtractedParameter(
         name=key_name,
-        description=description,
+        description=full_description,
         json_schema=schema,
         required=not getattr(field, "is_optional", False),
     )

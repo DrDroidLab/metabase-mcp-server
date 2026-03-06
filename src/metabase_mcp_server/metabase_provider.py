@@ -56,7 +56,8 @@ class MetabaseToolProvider:
         if task_type_name is None or task_type_value is None:
             raise ValueError(f"Tool {name} missing task_type metadata")
         task_field = task_type_name.lower()
-        task_payload = _wrap_value(arguments) if arguments else {}
+        # Pass arguments as plain scalars; protobuf ParseDict expects scalars for Int64Value/StringValue, not {"value": ...}.
+        task_payload = dict(arguments) if arguments else {}
         now_ns = int(__import__("time").time() * 1_000_000_000)
         time_range = TimeRange(time_geq=now_ns - 86400 * 1_000_000_000, time_lt=now_ns)
         task_dict = {
