@@ -211,7 +211,3 @@ metabase-mcp-server/
     ├── conftest.py
     └── test_server.py
 ```
-
-## License
-
-Same as the template / your organization.

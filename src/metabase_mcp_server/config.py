@@ -54,6 +54,19 @@ def _get_bool(env_name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _get_port(env_name: str, default: int) -> int:
+    raw = os.getenv(env_name)
+    if raw is None:
+        return default
+    try:
+        port = int(raw.strip())
+        if 1 <= port <= 65535:
+            return port
+    except ValueError:
+        pass
+    return default
+
+
 def load_config() -> AppConfig:
     """
     Build an AppConfig from environment variables.
@@ -67,7 +80,7 @@ def load_config() -> AppConfig:
         name=os.getenv("MCP_SERVER_NAME", "Metabase MCP Server"),
         transport=os.getenv("MCP_TRANSPORT", "stdio"),  # type: ignore[assignment]
         host=os.getenv("MCP_HOST", "0.0.0.0"),
-        port=int(os.getenv("MCP_PORT", "8000")),
+        port=_get_port("MCP_PORT", 8000),
         debug=_get_bool("MCP_DEBUG", False),
     )
 

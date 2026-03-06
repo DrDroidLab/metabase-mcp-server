@@ -12,6 +12,28 @@ def test_load_config_defaults():
     assert app_config.backend.metabase is not None
 
 
+def test_load_config_port_invalid_falls_back_to_default(monkeypatch):
+    """Invalid MCP_PORT is ignored and default 8000 is used."""
+    monkeypatch.setenv("MCP_PORT", "not-a-number")
+    app_config = config.load_config()
+    assert app_config.server.port == 8000
+
+    monkeypatch.setenv("MCP_PORT", "0")
+    app_config = config.load_config()
+    assert app_config.server.port == 8000
+
+    monkeypatch.setenv("MCP_PORT", "99999")
+    app_config = config.load_config()
+    assert app_config.server.port == 8000
+
+
+def test_load_config_port_valid(monkeypatch):
+    """Valid MCP_PORT is used."""
+    monkeypatch.setenv("MCP_PORT", "9000")
+    app_config = config.load_config()
+    assert app_config.server.port == 9000
+
+
 def _metabase_creds():
     """Return (url, api_key) from config; (None, None) if not set."""
     app_config = config.load_config()
@@ -54,3 +76,17 @@ def test_metabase_list_databases():
     result = provider.call_tool("metabase_list_databases", {})
     assert not result.get("error"), result
     assert isinstance(result, dict), result
+
+
+def test_provider_unknown_tool_raises():
+    """Unknown tool name raises ValueError (not returned as error dict)."""
+    url, api_key = _metabase_creds()
+    if not url or not api_key:
+        pytest.skip("METABASE_URL and METABASE_API_KEY required for provider test.")
+    try:
+        from metabase_mcp_server.metabase_provider import MetabaseToolProvider
+    except ImportError as e:
+        pytest.skip(f"drdroid-debug-toolkit not available: {e}")
+    provider = MetabaseToolProvider(url, api_key)
+    with pytest.raises(ValueError, match="Unknown tool"):
+        provider.call_tool("metabase_nonexistent_tool_xyz", {})

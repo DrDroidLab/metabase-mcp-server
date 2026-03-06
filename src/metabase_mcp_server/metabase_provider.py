@@ -18,23 +18,6 @@ from .tool_provider import ToolDefinition
 logger = logging.getLogger(__name__)
 
 
-def _wrap_value(v: Any) -> Any:
-    """Wrap primitives for protobuf (Int64Value, StringValue, etc.)."""
-    if v is None:
-        return None
-    if isinstance(v, dict):
-        return {k: _wrap_value(x) for k, x in v.items()}
-    if isinstance(v, list):
-        return [_wrap_value(x) for x in v]
-    if isinstance(v, bool):
-        return {"value": v}
-    if isinstance(v, int):
-        return {"value": v}
-    if isinstance(v, (float, str)):
-        return {"value": v}
-    return v
-
-
 class MetabaseToolProvider:
     """Exposes MetabaseSourceManager tasks as MCP tools."""
 

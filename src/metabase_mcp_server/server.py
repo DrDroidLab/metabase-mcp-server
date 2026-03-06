@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 import sys
 from inspect import Parameter, Signature
 from pathlib import Path
@@ -35,6 +36,8 @@ from .config import load_config
 from .metabase_provider import MetabaseToolProvider
 from .tool_provider import ToolDefinition, ToolProvider
 
+logger = logging.getLogger(__name__)
+
 # Create the FastMCP server instance.
 app_config = load_config()
 mcp = FastMCP(app_config.server.name, json_response=True)
@@ -44,6 +47,11 @@ _provider: Optional[ToolProvider] = None
 
 if app_config.backend.metabase and app_config.backend.metabase.url and app_config.backend.metabase.api_key:
     _provider = MetabaseToolProvider(app_config.backend.metabase.url, app_config.backend.metabase.api_key)
+    logger.info("Metabase tool provider configured; tools will be registered.")
+else:
+    logger.warning(
+        "Metabase not configured (METABASE_URL and METABASE_API_KEY required). No tools will be exposed."
+    )
 
 # Map JSON Schema types to Python types for FastMCP parameter introspection.
 _JSON_TYPE_TO_PY: Dict[str, type] = {
@@ -60,10 +68,12 @@ def _make_tool_fn(tool_name: str) -> Any:
     """Return a callable that executes the given provider tool by name."""
     def _call(**kwargs: Any) -> Any:
         if _provider is None:
+            logger.warning("Tool %s called but no provider configured.", tool_name)
             return {"error": "No tool provider configured."}
         try:
             return _provider.call_tool(tool_name, kwargs)
         except Exception as e:
+            logger.exception("Tool %s failed: %s", tool_name, e)
             return {"error": str(e)}
     return _call
 
@@ -108,6 +118,8 @@ def set_tool_provider(provider: ToolProvider) -> None:
 
 # Register each backend tool (e.g. metabase_list_databases, metabase_get_alert) as its own MCP tool.
 _register_provider_tools()
+if _provider:
+    logger.info("Registered %d MCP tool(s).", len(_provider.list_tools()))
 
 
 def main() -> None:
