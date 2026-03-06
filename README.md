@@ -22,7 +22,7 @@ The server exposes each Metabase operation as its own MCP tool, with names and p
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-org/metabase-mcp-server.git
+git clone https://github.com/DrDroidLab/metabase-mcp-server.git
 cd metabase-mcp-server
 uv venv .venv && source .venv/bin/activate   # or: python -m venv .venv && source .venv/bin/activate
 uv sync   # or: pip install -e .
